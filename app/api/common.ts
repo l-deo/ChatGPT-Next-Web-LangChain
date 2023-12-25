@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSideConfig } from "../config/server";
-import { DEFAULT_MODELS, OPENAI_BASE_URL } from "../constant";
+import { DEFAULT_MODELS, OPENAI_BASE_URL, GEMINI_BASE_URL } from "../constant";
 import { collectModelTable } from "../utils/model";
 import { makeAzurePath } from "../azure";
 
@@ -9,7 +9,15 @@ const serverConfig = getServerSideConfig();
 export async function requestOpenai(req: NextRequest) {
   const controller = new AbortController();
 
-  const authValue = req.headers.get("Authorization") ?? "";
+  let authValue = req.headers.get("Authorization") ?? "";
+  if (serverConfig.isAzure) {
+    authValue =
+      req.headers
+        .get("Authorization")
+        ?.trim()
+        .replaceAll("Bearer ", "")
+        .trim() ?? "";
+  }
   const authHeaderName = serverConfig.isAzure ? "api-key" : "Authorization";
 
   let path = `${req.nextUrl.pathname}${req.nextUrl.search}`.replaceAll(
@@ -30,7 +38,10 @@ export async function requestOpenai(req: NextRequest) {
 
   console.log("[Proxy] ", path);
   console.log("[Base Url]", baseUrl);
-  console.log("[Org ID]", serverConfig.openaiOrgId);
+  // this fix [Org ID] undefined in server side if not using custom point
+  if (serverConfig.openaiOrgId !== undefined) {
+    console.log("[Org ID]", serverConfig.openaiOrgId);
+  }
 
   const timeoutId = setTimeout(
     () => {
