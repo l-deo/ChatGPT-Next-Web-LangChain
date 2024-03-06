@@ -1,3 +1,4 @@
+"use client";
 import {
   ApiPath,
   DEFAULT_API_HOST,
@@ -15,6 +16,7 @@ import {
   LLMApi,
   LLMModel,
   LLMUsage,
+  SpeechOptions,
 } from "../api";
 import Locale from "../../locales";
 import {
@@ -53,7 +55,9 @@ export class ChatGPTApi implements LLMApi {
 
     if (baseUrl.length === 0) {
       const isApp = !!getClientConfig()?.isApp;
-      baseUrl = isApp ? DEFAULT_API_HOST : ApiPath.OpenAI;
+      baseUrl = isApp
+        ? DEFAULT_API_HOST + "/proxy" + ApiPath.OpenAI
+        : ApiPath.OpenAI;
     }
 
     if (baseUrl.endsWith("/")) {
@@ -68,11 +72,51 @@ export class ChatGPTApi implements LLMApi {
       return [baseUrl, model, path].join("/");
     }
 
+    console.log("[Proxy Endpoint] ", baseUrl, path);
+
     return [baseUrl, path].join("/");
   }
 
   extractMessage(res: any) {
     return res.choices?.at(0)?.message?.content ?? "";
+  }
+
+  async speech(options: SpeechOptions): Promise<ArrayBuffer> {
+    const requestPayload = {
+      model: options.model,
+      input: options.input,
+      voice: options.voice,
+      response_format: options.response_format,
+      speed: options.speed,
+    };
+
+    console.log("[Request] openai speech payload: ", requestPayload);
+
+    const controller = new AbortController();
+    options.onController?.(controller);
+
+    try {
+      const speechPath = this.path(OpenaiPath.SpeechPath, options.model);
+      const speechPayload = {
+        method: "POST",
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal,
+        headers: getHeaders(),
+      };
+
+      // make a fetch request
+      const requestTimeoutId = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
+
+      const res = await fetch(speechPath, speechPayload);
+      clearTimeout(requestTimeoutId);
+      return await res.arrayBuffer();
+    } catch (e) {
+      console.log("[Request] failed to make a speech request", e);
+      throw e;
+    }
   }
 
   async chat(options: ChatOptions) {
@@ -135,10 +179,9 @@ export class ChatGPTApi implements LLMApi {
       presence_penalty: modelConfig.presence_penalty,
       frequency_penalty: modelConfig.frequency_penalty,
       top_p: modelConfig.top_p,
-      max_tokens:
-        modelConfig.model == "gpt-4-vision-preview"
-          ? modelConfig.max_tokens
-          : null,
+      max_tokens: modelConfig.model.includes("vision")
+        ? modelConfig.max_tokens
+        : null,
       // max_tokens: Math.max(modelConfig.max_tokens, 1024),
       // Please do not ask me why not send max_tokens, no reason, this param is just shit, I dont want to explain anymore.
     };

@@ -72,6 +72,7 @@ import { nanoid } from "nanoid";
 import { PluginConfigList } from "./plugin-config";
 import { useMaskStore } from "../store/mask";
 import { ProviderType } from "../utils/cloud";
+import { TTSConfigList } from "./tts-config";
 
 function EditPromptModal(props: { id: string; onClose: () => void }) {
   const promptStore = usePromptStore();
@@ -269,7 +270,7 @@ function CheckButton() {
   const syncStore = useSyncStore();
 
   const couldCheck = useMemo(() => {
-    return syncStore.coundSync();
+    return syncStore.cloudSync();
   }, [syncStore]);
 
   const [checkState, setCheckState] = useState<
@@ -473,7 +474,7 @@ function SyncItems() {
   const promptStore = usePromptStore();
   const maskStore = useMaskStore();
   const couldSync = useMemo(() => {
-    return syncStore.coundSync();
+    return syncStore.cloudSync();
   }, [syncStore]);
 
   const [showSyncConfigModal, setShowSyncConfigModal] = useState(false);
@@ -801,7 +802,11 @@ export function Settings() {
           >
             <input
               type="checkbox"
-              checked={config.enableAutoGenerateTitle}
+              disabled={!!process.env.NEXT_PUBLIC_DISABLE_AUTOGENERATETITLE}
+              checked={
+                !process.env.NEXT_PUBLIC_DISABLE_AUTOGENERATETITLE &&
+                config.enableAutoGenerateTitle
+              }
               onChange={(e) =>
                 updateConfig(
                   (config) =>
@@ -1049,7 +1054,7 @@ export function Settings() {
                         <input
                           type="text"
                           value={accessStore.azureApiVersion}
-                          placeholder="2023-08-01-preview"
+                          placeholder="2024-02-15-preview"
                           onChange={(e) =>
                             accessStore.update(
                               (access) =>
@@ -1108,7 +1113,7 @@ export function Settings() {
                         <input
                           type="text"
                           value={accessStore.googleApiVersion}
-                          placeholder="2023-08-01-preview"
+                          placeholder="2024-02-15-preview"
                           onChange={(e) =>
                             accessStore.update(
                               (access) =>
@@ -1190,6 +1195,17 @@ export function Settings() {
               const pluginConfig = { ...config.pluginConfig };
               updater(pluginConfig);
               config.update((config) => (config.pluginConfig = pluginConfig));
+            }}
+          />
+        </List>
+
+        <List>
+          <TTSConfigList
+            ttsConfig={config.ttsConfig}
+            updateConfig={(updater) => {
+              const ttsConfig = { ...config.ttsConfig };
+              updater(ttsConfig);
+              config.update((config) => (config.ttsConfig = ttsConfig));
             }}
           />
         </List>
